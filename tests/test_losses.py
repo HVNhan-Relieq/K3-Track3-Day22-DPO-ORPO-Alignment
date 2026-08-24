@@ -1,4 +1,5 @@
 import math
+import warnings
 
 import numpy as np
 import pytest
@@ -75,4 +76,16 @@ def test_orpo_loss_is_finite_for_extreme_logprobs() -> None:
     result = orpo_loss(
         np.array([0.1]), np.array([-1e-6]), np.array([-30.0]), lambda_orpo=0.1
     )
+    assert math.isfinite(result)
+
+
+def test_orpo_loss_handles_logp_zero_without_warning_or_nan() -> None:
+    # logp == 0.0 (p == 1.0) is the documented ORPO edge case: naive log1mexp(0) is
+    # -inf, which used to leak into log-odds and trigger "divide by zero" warnings.
+    # orpo_loss must clip logp away from the boundary instead.
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", RuntimeWarning)
+        result = orpo_loss(
+            np.array([0.1]), np.array([0.0]), np.array([-1.0]), lambda_orpo=0.1
+        )
     assert math.isfinite(result)

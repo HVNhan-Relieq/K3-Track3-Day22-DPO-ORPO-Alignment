@@ -2,6 +2,12 @@ from __future__ import annotations
 
 import numpy as np
 
+# Sequence log-probabilities are mathematically in (-inf, 0], but exactly 0.0 (p == 1.0)
+# sends log1mexp to -inf (RuntimeWarning: divide by zero) and blows up the odds ratio.
+# Clipping away from both boundaries keeps orpo_loss finite and warning-free.
+_LOGP_CLIP_MIN = -30.0
+_LOGP_CLIP_MAX = -1e-7
+
 
 def _log_sigmoid(x: np.ndarray) -> np.ndarray:
     """Numerically stable log(sigmoid(x)) = -log(1 + exp(-x)) = -softplus(-x)."""
@@ -66,8 +72,12 @@ def orpo_loss(
     and L_SFT is the mean of the (already-computed, per-example) `sft_nll`.
     """
     sft_nll = np.asarray(sft_nll, dtype=np.float64)
-    chosen_logps = np.asarray(chosen_logps, dtype=np.float64)
-    rejected_logps = np.asarray(rejected_logps, dtype=np.float64)
+    chosen_logps = np.clip(
+        np.asarray(chosen_logps, dtype=np.float64), _LOGP_CLIP_MIN, _LOGP_CLIP_MAX
+    )
+    rejected_logps = np.clip(
+        np.asarray(rejected_logps, dtype=np.float64), _LOGP_CLIP_MIN, _LOGP_CLIP_MAX
+    )
 
     chosen_log_odds = chosen_logps - _log1mexp(chosen_logps)
     rejected_log_odds = rejected_logps - _log1mexp(rejected_logps)
