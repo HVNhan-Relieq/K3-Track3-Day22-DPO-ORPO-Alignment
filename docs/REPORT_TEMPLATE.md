@@ -31,7 +31,7 @@
 | Metric | Value |
 |---|---|
 | Pairwise Accuracy | `95.83%` |
-| Final Loss (Mock/Train) | Not trained end-to-end (`PreferenceTrainer.train()` is still an unimplemented `TODO(student)` hook for wiring up TRL/PyTorch); DPO loss on a small hand-picked batch = `0.664` for well-separated logprobs and `50.35` for the deliberately extreme case above. |
+| Final Loss (Mock) | `0.635` (DPO, epoch 5/5) via `pref-lab train --config configs/local.yaml` -- see note below. |
 
 Pasted from `outputs/metrics.json` (git-ignored; regenerate with `make run-eval`):
 ```json
@@ -39,6 +39,18 @@ Pasted from `outputs/metrics.json` (git-ignored; regenerate with `make run-eval`
   "pairwise_accuracy": 0.9583333333333334
 }
 ```
+
+**Extension implemented: mock CPU trainer.** `PreferenceTrainer.train()` (`src/preference_lab/trainers.py`) is now implemented as the "mock trainer on CPU" option from the lab's extension list, not the TRL-backed one (no torch/GPU available in this environment). It does **not** train a real neural network: each example's `chosen`/`rejected` text gets a deterministic simulated log-probability (`_pseudo_logprob`, a SHA-256-derived value combined with a length penalty), and each epoch nudges the simulated *policy* log-probs toward preferring `chosen` a little more while the simulated *reference* log-probs stay fixed -- a stand-in for what a real gradient step would do. The already-implemented `dpo_loss`/`orpo_loss` is called on this simulated data every batch, so the loop genuinely exercises batching, epoch iteration, and loss logging to `output_dir/train_log.json`, and the loss curve behaves the way a real one should (monotonically decreasing, verified in `tests/test_trainers.py`):
+```json
+{
+  "method": "dpo",
+  "num_epochs": 5,
+  "batch_size": 2,
+  "num_examples": 19,
+  "loss_history": [0.6931, 0.6783, 0.6636, 0.6492, 0.6349]
+}
+```
+Swapping in a real policy/reference model (e.g. wrapping `trl.DPOTrainer`/`trl.ORPOTrainer` after `pip install -e '.[dev,train]'`) would only require replacing `_pseudo_logprob` and the per-epoch nudge with real forward passes -- the batching/logging/loss-selection plumbing around it would not need to change.
 
 ### Qualitative Review
 - **Prompt**: `Explain what a hash table is and why it offers fast average-case lookups.`
