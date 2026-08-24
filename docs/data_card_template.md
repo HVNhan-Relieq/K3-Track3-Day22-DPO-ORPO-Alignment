@@ -1,10 +1,10 @@
 # Data Card
 
-- Dataset name:
-- Source:
-- License/permission:
-- Schema:
-- Labeling rubric:
-- Known biases:
-- Safety/PII checks:
-- Train/validation/test split method:
+- Dataset name: Preference Alignment Lab Sample Preferences (`data/sample_preferences.jsonl`), plus a supplementary `data/synthetic_preferences.jsonl`.
+- Source: `sample_preferences.jsonl` ships with the lab starter repo as example data for the exercise. `synthetic_preferences.jsonl` (12 pairs) was hand-authored for this submission (not generated via `scripts/generate_data.py`, since no `OPENAI_API_KEY` was available in this environment) to widen domain coverage beyond ML/CS trivia into coding, safety-refusal, math, summarization, uncertainty, and clarifying-question behaviors.
+- License/permission: Lab-provided starter content and locally authored educational examples; no third-party copyrighted text, no scraped data, no real user data. Safe to use within this course context.
+- Schema: One JSON object per line: `prompt: str`, `chosen: str`, `rejected: str`, `metadata: dict` (typically `{"domain": str, "rubric": str}`, plus `"source": "hand-authored"` on the synthetic file). Enforced by the `PreferenceExample` pydantic model in `src/preference_lab/schemas.py`.
+- Labeling rubric: Each pair's `rejected` response was chosen to be plausible but worse than `chosen` along one dominant axis named in `metadata.rubric`: factual `accuracy` (most of the original 24), `correctness` (code/math bugs), `safety` (dangerous or irresponsible advice that should be rejected), `calibration` (false confidence about unknowable facts), `clarifying-questions` (guessing vs. asking for missing context), or `instruction-following` (ignoring an explicit constraint like "exactly one sentence").
+- Known biases: All 24 original examples share `domain: "education"` and a uniform "chosen = accurate, rejected = plausible-but-wrong" pattern, so the set skews toward short technical Q&A and doesn't cover multi-turn conversations, adversarial prompts, or non-English text. The synthetic additions are still a small (12-example), single-author sample and should not be treated as a representative or exhaustive safety/quality benchmark. The deterministic CLI scorer used for evaluation (`score_response`) also has its own length/keyword-overlap bias (see report, Section 4), which is a property of the scorer, not the data.
+- Safety/PII checks: All prompts and responses are synthetic/educational (ML/CS concepts, generic troubleshooting, textbook safety scenarios) — no real names, contact details, credentials, or other personal data are present. The safety-themed pairs (medical, chemical) are deliberately conservative model responses (refuse/redirect to a professional or emergency service) rather than actual medical/chemical guidance.
+- Train/validation/test split method: `split_by_prompt` (`src/preference_lab/data.py`) groups examples by normalized prompt, deterministically shuffles the groups with a fixed `seed` (default `42`, matching `configs/local.yaml`), and allocates whole prompt-groups to validation until `validation_ratio` (`0.2` by default) of examples is covered — guaranteeing no prompt appears in both splits. No held-out test split is defined in this lab; only train/validation.
